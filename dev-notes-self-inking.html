@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Developer Implementation Notes — Self Inking Rubber Stamps | StampStore</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* ── RESET & TOKENS ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:        #063aa7;
+  --blue-mid:    #1a56d6;
+  --blue-light:  #2563eb;
+  --blue-pale:   #eef2fd;
+  --blue-border: #bfdbfe;
+  --blue-muted:  #3b5bdb;
+  --blue-accent: #60a5fa;
+  --text-dark:   #0f172a;
+  --text-body:   #1e293b;
+  --text-muted:  #475569;
+  --white:       #ffffff;
+  --bg:          #f8fafc;
+  --border:      #e2e8f0;
+  --amber-pale:  #fef3c7;
+  --amber-bdr:   #fcd34d;
+  --amber:       #92400e;
+  --green-pale:  #f0fdf4;
+  --green-bdr:   #86efac;
+  --green:       #15803d;
+  --code-bg:     #0d1117;
+  --code-text:   #e6edf3;
+  --mono:'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+  --r-sm:8px;--r-md:12px;--r-lg:18px;
+}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.7;color:var(--text-dark);background:var(--bg)}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--blue);color:rgba(255,255,255,.8);font-size:12px;padding:8px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+.topbar-trust{display:flex;gap:18px}
+.topbar-trust span::before{content:'✓ ';color:var(--blue-accent)}
+.topbar a{color:var(--blue-accent);text-decoration:none}
+
+/* ── HEADER ── */
+.doc-header{background:linear-gradient(135deg,var(--blue) 0%,var(--blue-mid) 60%,var(--blue-light) 100%);padding:36px 40px 30px;color:white}
+.back-link{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,.65);text-decoration:none;margin-bottom:18px;transition:color .2s}
+.back-link:hover{color:var(--blue-accent)}
+.back-link svg{width:12px;height:12px}
+.header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:18px}
+.doc-header h1{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:white;line-height:1.25}
+.doc-header h1 span{color:var(--blue-accent)}
+.status-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:white;font-size:11px;font-weight:700;padding:6px 14px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;flex-shrink:0}
+.status-dot{width:7px;height:7px;background:var(--blue-accent);border-radius:50%}
+.meta-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 0;font-size:12.5px;color:rgba(255,255,255,.65);border-top:1px solid rgba(255,255,255,.12);padding-top:16px}
+.meta-grid strong{display:block;color:white;font-weight:600;font-size:13px}
+
+/* ── TOC BAR ── */
+.toc-bar{background:var(--white);border-bottom:1px solid var(--border);padding:11px 40px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;position:sticky;top:0;z-index:50;box-shadow:0 1px 8px rgba(0,0,0,.06)}
+.toc-label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-right:4px}
+.toc-link{font-size:12px;color:var(--blue);text-decoration:none;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--white);transition:background .2s;white-space:nowrap}
+.toc-link:hover{background:var(--blue-pale);border-color:var(--blue-border)}
+
+/* ── MAIN CONTENT ── */
+.content{max-width:1100px;margin:0 auto;padding:36px 40px 80px}
+
+/* ── SECTION HEADINGS ── */
+.section{margin-bottom:52px}
+.section-eyebrow{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--blue-mid);margin-bottom:6px;display:block}
+.section-h2{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--text-dark);margin-bottom:10px;line-height:1.25}
+.section-intro{font-size:14px;color:var(--text-muted);margin-bottom:22px;line-height:1.7;max-width:700px}
+.section-head-row{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.section-num{width:28px;height:28px;background:var(--blue);color:white;border-radius:50%;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.section-divider{border:none;border-top:2px solid var(--border);margin:0 0 28px}
+
+/* ── OVERVIEW BOX ── */
+.overview-box{background:var(--blue-pale);border-left:4px solid var(--blue);border-radius:0 var(--r-sm) var(--r-sm) 0;padding:18px 22px;font-size:14px;color:var(--text-body);line-height:1.75}
+.overview-box strong{color:var(--blue)}
+
+/* ── SEO BENEFIT BOX ── */
+.seo-box{background:#f0f7ff;border:1.5px solid var(--blue-border);border-radius:var(--r-sm);padding:16px 20px;margin-bottom:20px}
+.seo-box-hd{font-size:10.5px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.seo-box p{font-size:13px;color:var(--text-muted);line-height:1.65;margin-bottom:8px}
+.seo-box ul{margin-left:16px;display:flex;flex-direction:column;gap:4px}
+.seo-box ul li{font-size:13px;color:var(--text-muted);list-style:disc}
+.seo-box ul li strong{color:var(--text-dark)}
+
+/* ── BEFORE / AFTER GRID ── */
+.ba-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1.5px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--white);box-shadow:0 2px 12px rgba(6,58,167,.06)}
+.ba-col{display:flex;flex-direction:column}
+.ba-header{display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.ba-header.before-h{background:var(--amber-pale);color:#78350f;border-right:1px solid var(--border)}
+.ba-header.after-h{background:var(--blue-pale);color:var(--blue)}
+.ba-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ba-dot.before-dot{background:#d97706}
+.ba-dot.after-dot{background:var(--blue)}
+.ba-body{padding:20px;font-size:13.5px;color:var(--text-body);line-height:1.75;flex:1}
+.ba-body.before-body{background:#fffdf7;border-right:1px solid var(--border)}
+.ba-body.after-body{background:#f5f8ff}
+.ba-body strong{color:var(--text-dark)}
+.ba-body em{color:var(--text-muted);font-style:italic}
+
+/* ── CODE BLOCKS ── */
+pre{background:var(--code-bg);color:var(--code-text);padding:16px 18px;border-radius:var(--r-sm);font-family:var(--mono);font-size:12px;line-height:1.7;overflow-x:auto;margin:12px 0 0;white-space:pre}
+pre::-webkit-scrollbar{height:4px}
+pre::-webkit-scrollbar-thumb{background:#444;border-radius:2px}
+code{background:var(--blue-pale);color:var(--blue);padding:1px 6px;border-radius:4px;font-family:var(--mono);font-size:12px;border:1px solid var(--blue-border)}
+pre code{background:none;border:none;color:inherit;padding:0;font-size:inherit}
+.kw{color:#ff79c6}.fn{color:#50fa7b}.str{color:#a8ff78}.cm{color:#6272a4;font-style:italic}.at{color:#79c0ff}.va{color:#ffb86c}
+
+/* ── VAR PILLS ── */
+.var-pill{display:inline-block;background:#e0e7ff;color:#3730a3;border-radius:4px;padding:1px 7px;font-size:12px;font-family:var(--mono);border:1px solid #c7d2fe}
+
+/* ── CALLOUT BOXES ── */
+.callout{display:flex;gap:12px;border-radius:var(--r-sm);padding:14px 18px;margin:16px 0;font-size:13px;line-height:1.65;align-items:flex-start}
+.callout-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.callout strong{display:block;margin-bottom:3px;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.callout-warn{background:var(--amber-pale);border:1px solid var(--amber-bdr);color:#92400e}
+.callout-warn strong{color:#78350f}
+.callout-info{background:var(--blue-pale);border:1px solid var(--blue-border);color:#1e40af}
+.callout-info strong{color:var(--blue)}
+.callout-ok{background:var(--green-pale);border:1px solid var(--green-bdr);color:#166534}
+.callout-ok strong{color:#14532d}
+
+/* ── TABLE ── */
+.table-wrap{overflow-x:auto;border-radius:var(--r-md);border:1px solid var(--border);margin:16px 0}
+table{width:100%;border-collapse:collapse;font-size:13px;background:var(--white)}
+thead tr{background:var(--blue)}
+thead th{padding:11px 14px;text-align:left;color:white;font-weight:600;font-size:11px;letter-spacing:.5px;text-transform:uppercase}
+tbody tr:nth-child(even) td{background:#f5f8ff}
+tbody td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text-body);vertical-align:top}
+tbody tr:last-child td{border-bottom:none}
+
+/* ── SIGN OFF CHECKLIST ── */
+.cl-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}
+.cl-item{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:var(--r-sm);background:var(--white);border:1.5px solid var(--border)}
+.cl-box{width:16px;height:16px;border:2px solid var(--border);border-radius:3px;flex-shrink:0;margin-top:3px}
+.cl-label{font-size:12.5px;color:var(--text-body);line-height:1.5}
+.cl-label strong{color:var(--text-dark);display:block;font-size:13px;margin-bottom:2px}
+
+/* ── FOOTER ── */
+.doc-footer{background:var(--blue);color:rgba(255,255,255,.6);padding:18px 40px;font-size:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.doc-footer a{color:rgba(255,255,255,.65);text-decoration:none}
+.doc-footer a:hover{color:white}
+
+/* ── RESPONSIVE ── */
+@media(max-width:700px){
+  .topbar{padding:8px 16px;flex-direction:column;text-align:center}
+  .doc-header{padding:24px 20px 20px}
+  .doc-header h1{font-size:20px}
+  .meta-grid{grid-template-columns:1fr 1fr}
+  .toc-bar{padding:10px 16px;overflow-x:auto;flex-wrap:nowrap}
+  .toc-link{flex-shrink:0}
+  .content{padding:24px 16px 60px}
+  .ba-grid{grid-template-columns:1fr}
+  .ba-header.before-h{border-right:none;border-bottom:1px solid var(--border)}
+  .ba-body.before-body{border-right:none;border-bottom:1px solid var(--border)}
+  .cl-grid{grid-template-columns:1fr}
+  .doc-footer{padding:14px 16px;flex-direction:column;text-align:center}
+}
+@media(min-width:701px) and (max-width:900px){
+  .content{padding:28px 24px 60px}
+  .meta-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div>
+    <a href="tel:1300782671">1300 782 671</a>
+    &nbsp;·&nbsp;
+    <a href="mailto:info@stamps.net.au">info@stamps.net.au</a>
+  </div>
+  <div class="topbar-trust">
+    <span>Pillar Page Revamp</span>
+    <span>Custom PHP CMS</span>
+    <span>10 Sections · 24 Changes</span>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="doc-header">
+  <a href="self-inking-rubber-stamps.html" class="back-link">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
+    Back to Pillar Page
+  </a>
+  <div class="header-row">
+    <h1>Developer Implementation Notes<br><span>Self Inking Rubber Stamps — Pillar Page Revamp</span></h1>
+    <div class="status-badge">
+      <span class="status-dot"></span>
+      Proposed
+    </div>
+  </div>
+  <div class="meta-grid">
+    <div>Target URL<strong>stamps.net.au/self-inking-rubber-stamps</strong></div>
+    <div>Current Status<strong>#1 Ranking — Handle with care</strong></div>
+    <div>Prepared by<strong>Girish Kumar G — Father of SEO</strong></div>
+    <div>Stack<strong>Custom PHP CMS</strong></div>
+  </div>
+</div>
+
+<!-- TOC BAR -->
+<nav class="toc-bar" aria-label="Document sections">
+  <span class="toc-label">Jump to</span>
+  <a class="toc-link" href="#s0">Overview</a>
+  <a class="toc-link" href="#s1">Meta Tags</a>
+  <a class="toc-link" href="#s2">Structured Data</a>
+  <a class="toc-link" href="#s3">Heading Hierarchy</a>
+  <a class="toc-link" href="#s4">Hero &amp; Alignment</a>
+  <a class="toc-link" href="#s5">Brand Strip</a>
+  <a class="toc-link" href="#s6">Product Grid</a>
+  <a class="toc-link" href="#s7">Image Alt &amp; Title</a>
+  <a class="toc-link" href="#s8">Brand Cards + Decision</a>
+  <a class="toc-link" href="#s9">Reviews &amp; FAQ</a>
+  <a class="toc-link" href="#s10">Mobile Responsive</a>
+  <a class="toc-link" href="#s11">Sign-off Checklist</a>
+</nav>
+
+<div class="content">
+
+  <!-- ── OVERVIEW ── -->
+  <div class="section" id="s0">
+    <span class="section-eyebrow">What this document covers</span>
+    <h2 class="section-h2">Overview</h2>
+    <hr class="section-divider">
+    <div class="overview-box">
+      This note covers the full implementation of the revamped <strong>stamps.net.au/self-inking-rubber-stamps</strong> pillar page — the site's #1 ranking page and primary revenue driver. The revamp transforms a single-brand DF category page into a multi-brand pillar hub serving DF, Trodat, Colop, and Trodat Multi-Colour.<br><br>
+      Each section shows the <strong>Existing Code</strong> (extracted from the live page HTML) alongside the <strong>Proposed Code</strong> from the staging file. Every change includes its SEO purpose and a go-live checklist item. The staging file is <code>self-inking-rubber-stamps.html</code>.
+      <br><br>
+      <strong>Critical rule:</strong> All product HTML is pre-rendered server-side in the DOM. No JS-rendered products. No lazy-loaded tabs. CSS class toggle only for brand switching.
+    </div>
+  </div>
+
+  <!-- ── S1: META TAGS ── -->
+  <div class="section" id="s1">
+    <div class="section-head-row">
+      <div class="section-num">1</div>
+      <span class="section-eyebrow" style="margin-bottom:0">Page-Level Meta</span>
+    </div>
+    <h2 class="section-h2">Meta Tags &amp; Robots</h2>
+    <hr class="section-divider">
+    <p class="section-intro">The existing page has no <code>robots</code> meta tag, a multiline broken meta description, and no OG/Twitter tags. These are foundational signals Google uses to crawl, index, and display the page in SERPs.</p>
+
+    <div class="seo-box">
+      <div class="seo-box-hd">📈 SEO Purpose</div>
+      <ul>
+        <li><strong>Robots meta:</strong> Explicit <code>noindex,nofollow</code> during staging prevents accidental indexation of an incomplete page. Change to <code>index,follow</code> before go-live.</li>
+        <li><strong>Title tag:</strong> Updated from single-brand "DF Self Inking Rubber Stamps" to multi-brand pillar title. Adds brand signal + geo ("Australia") for local relevance.</li>
+        <li><strong>Meta description:</strong> Existing desc is multiline with <code>&amp;nbsp;</code> padding — truncates badly in SERPs. New single-line desc is clean, includes price anchor and brand names.</li>
+        <li><strong>OG + Twitter Card:</strong> Enables correct previews when the URL is shared on social, Slack, or in email. Currently absent on the live page.</li>
+      </ul>
+    </div>
+
+    <div class="ba-grid">
+      <div class="ba-col">
+        <div class="ba-header before-h"><span class="ba-dot before-dot"></span>Existing Code (live page)</div>
+        <div class="ba-body before-body">
+          <em>No robots meta tag found on existing page.</em><br><br>
+          <strong>Existing title:</strong><br>
+          <code>DF Self Inking Rubber Stamps</code><br><br>
+          <strong>Existing description (multiline, broken):</strong>
+<pre><span class="kw">&lt;meta</span> <span class="at">name</span>=<span class="str">"description"</span>
+  <span class="at">content</span>=<span class="str">"Customisable self inking stamps
+
+Perfect for businesses, these stamps
+can be fully customised with your
+company name, address...
+
+&amp;nbsp;
+&amp;nbsp;"</span><span class="kw">&gt;</span>
+<span class="cm">// No OG tags. No Twitter card.</span></pre>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>Proposed Code</div>
+        <div class="ba-body after-body">
+<pre><span class="cm">&lt;!-- STAGING: change to index,follow --&gt;</span>
+<span class="kw">&lt;meta</span> <span class="at">name</span>=<span class="str">"robots"</span> <span class="at">content</span>=<span class="str">"noindex,
+  nofollow, max-snippet:-1,
+  max-image-preview:large"</span><span class="kw">&gt;</span>
+
+<span class="kw">&lt;title&gt;</span>
+  Self Inking Rubber Stamps |
+  DF, Trodat &amp; Colop |
+  StampStore Australia
+<span class="kw">&lt;/title&gt;</span>
+
+<span class="kw">&lt;meta</span> <span class="at">name</span>=<span class="str">"description"</span>
+  <span class="at">content</span>=<span class="str">"Shop Australia's largest range
+  of self-inking rubber stamps. DF,
+  Trodat, Colop and Trodat Multi-Colour
+  — all fully customisable. From $30."</span><span class="kw">&gt;</span>
+
+<span class="kw">&lt;link</span> <span class="at">rel</span>=<span class="str">"canonical"</span>
+  <span class="at">href</span>=<span class="str">"https://stamps.net.au/
+  self-inking-rubber-stamps"</span><span class="kw">&gt;</span>
+
+<span class="kw">&lt;meta</span> <span class="at">property</span>=<span class="str">"og:type"</span>
+  <span class="at">content</span>=<span class="str">"website"</span><span class="kw">&gt;</span>
+<span class="kw">&lt;meta</span> <span class="at">property</span>=<span class="str">"og:locale"</span>
+  <span class="at">content</span>=<span class="str">"en_AU"</span><span class="kw">&gt;</span>
+<span class="kw">&lt;meta</span> <span class="at">name</span>=<span class="str">"twitter:card"</span>
+  <span class="at">content</span>=<span class="str">"summary_large_image"</span><span class="kw">&gt;</span></pre>
+        </div>
+      </div>
+    </div>
+    <div class="callout callout-warn">
+      <span class="callout-icon">⚠️</span>
+      <div><strong>Go-Live Action Required</strong>Change robots meta to <code>index, follow</code> before pushing to production. Leaving <code>noindex</code> live will de-index the #1 ranking page.</div>
+    </div>
+  </div>
+
+  <!-- ── S2: STRUCTURED DATA ── -->
+  <div class="section" id="s2">
+    <div class="section-head-row">
+      <div class="section-num">2</div>
+      <span class="section-eyebrow" style="margin-bottom:0">Schema Markup</span>
+    </div>
+    <h2 class="section-h2">Structured Data (JSON-LD)</h2>
+    <hr class="section-divider">
+    <p class="section-intro">The existing page has <strong>zero structured data</strong> — 0 JSON-LD blocks found. The proposed page adds 4 static schemas to <code>&lt;head&gt;</code>, each targeting a different rich result type.</p>
+
+    <div class="seo-box">
+      <div class="seo-box-hd">📈 SEO Purpose</div>
+      <ul>
+        <li><strong>BreadcrumbList:</strong> Enables breadcrumb trail in SERP snippet → improves CTR by showing page depth at a glance.</li>
+        <li><strong>ItemList (16 featured products):</strong> Signals to Google which products are on this page → eligible for product carousel in SERPs and AI Overview citations.</li>
+        <li><strong>FAQPage (7 questions):</strong> Enables FAQ rich result below the main listing → can double SERP real estate. Also surfaces in Google AI Overviews.</li>
+        <li><strong>LocalBusiness:</strong> Reinforces AU business entity signals → supports geo-targeted ranking for "self inking stamps Australia" queries.</li>
+        <li><strong>All schemas static in &lt;head&gt;</strong> — not JS-rendered. Googlebot reads them on first crawl without needing to execute JavaScript.</li>
+      </ul>
+    </div>
+
+    <div class="ba-grid">
+      <div class="ba-col">
+        <div class="ba-header before-h"><span class="ba-dot before-dot"></span>Existing Code (live page)</div>
+        <div class="ba-body before-body">
+          <em>0 JSON-LD blocks on the current live page. No structured data of any kind.</em>
+<pre><span class="cm">// Verified: zero &lt;script type="application/ld+json"&gt;
+// blocks found in the existing page HTML.
+// No BreadcrumbList.
+// No Product schema.
+// No FAQPage.
+// No LocalBusiness.</span></pre>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>Proposed Code (in &lt;head&gt;)</div>
+        <div class="ba-body after-body">
+<pre><span class="cm">&lt;!-- 1 of 4: BreadcrumbList --&gt;</span>
+<span class="kw">&lt;script</span> <span class="at">type</span>=<span class="str">"application/ld+json"</span><span class="kw">&gt;</span>
+<span class="str">{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1,
+      "name": "Home",
+      "item": "https://stamps.net.au" },
+    { "@type": "ListItem", "position": 2,
+      "name": "Self Inking Rubber Stamps",
+      "item": "https://stamps.net.au/
+               self-inking-rubber-stamps" }
+  ]
+}</span>
+<span class="kw">&lt;/script&gt;</span>
+
+<span class="cm">&lt;!-- 2 of 4: ItemList (16 featured) --&gt;</span>
+<span class="cm">&lt;!-- 3 of 4: FAQPage (7 Q&amp;As) --&gt;</span>
+<span class="cm">&lt;!-- 4 of 4: LocalBusiness --&gt;</span>
+<span class="cm">// All 4 schemas: static server-rendered HTML
+// NO JavaScript injection
+// Validate at: search.google.com/test/rich-results</span></pre>
+        </div>
+      </div>
+    </div>
+    <div class="callout callout-info">
+      <span class="callout-icon">ℹ️</span>
+      <div><strong>Validation Step</strong>After deployment, run the live URL through <a href="https://search.google.com/test/rich-results" target="_blank">Google Rich Results Test</a>. All 4 schemas should validate with no errors or warnings.</div>
+    </div>
+  </div>
+
+  <!-- ── S3: HEADINGS ── -->
+  <div class="section" id="s3">
+    <div class="section-head-row">
+      <div class="section-num">3</div>
+      <span class="section-eyebrow" style="margin-bottom:0">Semantic Structure</span>
+    </div>
+    <h2 class="section-h2">Page Title &amp; Heading Hierarchy</h2>
+    <hr class="section-divider">
+    <p class="section-intro">The existing H1 targets a single-brand query. Product name H3s have no H2 parent above them. Below-fold H2s use double-nested <code>&lt;strong&gt;</code> tags for styling. All of this flattens the topical hierarchy that Google uses to understand page structure.</p>
+
+    <div class="seo-box">
+      <div class="seo-box-hd">📈 SEO Purpose</div>
+      <ul>
+        <li><strong>H1 → pillar keyword:</strong> "Self Inking Rubber Stamps" targets the broadest head term. The existing "DF Self Inking Rubber Stamps" only serves DF-brand queries.</li>
+        <li><strong>H2 → brand/section level:</strong> Each brand name, feature section, and content section gets an H2, giving Google crawlable topic signals across the full page.</li>
+        <li><strong>H3 → product names:</strong> All 115 product names, 7 FAQ questions, 4 feature titles, and 4 decision guide titles sit at H3 — correct for leaf-level specifics under an H2 parent.</li>
+        <li>Correct hierarchy improves screen reader accessibility (WCAG 2.1) and contributes to accessibility scoring in SEO audits.</li>
+      </ul>
+    </div>
+
+    <div class="ba-grid">
+      <div class="ba-col">
+        <div class="ba-header before-h"><span class="ba-dot before-dot"></span>Existing Code (live page)</div>
+        <div class="ba-body before-body">
+<pre><span class="cm">&lt;!-- H1: single-brand query --&gt;</span>
+<span class="kw">&lt;h1</span> <span class="at">class</span>=<span class="str">"title"</span><span class="kw">&gt;</span>
+  DF Self Inking Rubber Stamps
+<span class="kw">&lt;/h1&gt;</span>
+
+<span class="cm">&lt;!-- Product names: H3 with no H2 parent --&gt;</span>
+<span class="kw">&lt;h3</span> <span class="at">class</span>=<span class="str">"title"</span><span class="kw">&gt;</span>
+  DF 1028 Self Inking Rubber Stamp
+<span class="kw">&lt;/h3&gt;</span>
+
+<span class="cm">&lt;!-- Below-fold: double-nested strong --&gt;</span>
+<span class="kw">&lt;h2&gt;&lt;strong&gt;&lt;strong&gt;</span>
+  Customisable self inking stamps
+<span class="kw">&lt;/strong&gt;&lt;/strong&gt;&lt;/h2&gt;</span></pre>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>Proposed Code</div>
+        <div class="ba-body after-body">
+<pre><span class="cm">&lt;!-- 1× H1: pillar keyword --&gt;</span>
+<span class="kw">&lt;h1&gt;</span>Self Inking Rubber Stamps
+  <span class="kw">&lt;span&gt;</span>4 Brands. 115+ Products.<span class="kw">&lt;/span&gt;</span>
+<span class="kw">&lt;/h1&gt;</span>
+
+<span class="cm">&lt;!-- H2: section/brand level (15 total) --&gt;</span>
+<span class="kw">&lt;h2&gt;</span>DF Self Inking Stamps<span class="kw">&lt;/h2&gt;</span>
+<span class="kw">&lt;h2&gt;</span>Trodat Self Inking Stamps<span class="kw">&lt;/h2&gt;</span>
+<span class="kw">&lt;h2&gt;</span>Four Brands. One Trusted Store.<span class="kw">&lt;/h2&gt;</span>
+<span class="kw">&lt;h2&gt;</span>Which Brand Should You Choose?<span class="kw">&lt;/h2&gt;</span>
+
+<span class="cm">&lt;!-- H3: product names (115 total) --&gt;</span>
+<span class="kw">&lt;h3</span> <span class="at">class</span>=<span class="str">"pc-name"</span><span class="kw">&gt;</span>
+  <span class="kw">&lt;a</span> <span class="at">href</span>=<span class="str">"..."</span><span class="kw">&gt;</span>
+    DF 1028 Self Inking Rubber Stamp
+  <span class="kw">&lt;/a&gt;</span>
+<span class="kw">&lt;/h3&gt;</span>
+<span class="cm">// Count: 1×H1, 15×H2, 139×H3</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── S4: HERO ── -->
+  <div class="section" id="s4">
+    <div class="section-head-row">
+      <div class="section-num">4</div>
+      <span class="section-eyebrow" style="margin-bottom:0">Above the Fold</span>
+    </div>
+    <h2 class="section-h2">Hero Section &amp; Alignment Fix</h2>
+    <hr class="section-divider">
+    <p class="section-intro">The existing page has no hero — it goes directly from breadcrumb to H1 to product grid. The proposed compact hero adds page context and stat signals. The alignment fix resolves the H1/description column offset that caused the description to appear right-shifted.</p>
+
+    <div class="seo-box">
+      <div class="seo-box-hd">📈 SEO Purpose</div>
+      <ul>
+        <li><strong>Compact hero:</strong> Pushes products above the fold faster, signalling to Google this is a transactional category page — not a blog article.</li>
+        <li><strong>Stats bar (115+, 4 brands, from $30):</strong> Adds structured numeric content Google can extract for featured snippets and AI Overview summaries.</li>
+        <li><strong>Alignment root cause:</strong> Previous version used a flex/grid split that put H1 and description in separate columns. Fix: <code>.hero-inner</code> is a single-column block with <code>max-width:740px</code>. H1 and description are stacked siblings — no grid, no offset.</li>
+      </ul>
+    </div>
+
+    <div class="ba-grid">
+      <div class="ba-col">
+        <div class="ba-header before-h"><span class="ba-dot before-dot"></span>Existing Code (live page)</div>
+        <div class="ba-body before-body">
+<pre><span class="cm">&lt;!-- No hero section on existing page.
+     Goes: breadcrumb → H1 → products.
+     No stats, no CTA, no eyebrow. --&gt;</span>
+<span class="kw">&lt;section</span> <span class="at">class</span>=<span class="str">"breadcrumb"</span><span class="kw">&gt;</span>
+  <span class="kw">&lt;nav</span> <span class="at">class</span>=<span class="str">"breadcrumb"</span><span class="kw">&gt;</span>
+    <span class="kw">&lt;a</span> <span class="at">href</span>=<span class="str">"/"</span><span class="kw">&gt;</span>Home<span class="kw">&lt;/a&gt;</span>
+    <span class="kw">&lt;span</span> <span class="at">class</span>=<span class="str">"current"</span><span class="kw">&gt;</span>
+      DF Self Inking Rubber Stamps
+    <span class="kw">&lt;/span&gt;</span>
+  <span class="kw">&lt;/nav&gt;</span>
+<span class="kw">&lt;/section&gt;</span>
+<span class="cm">&lt;!-- Directly into product-section --&gt;</span></pre>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>Proposed Code (alignment fix)</div>
+        <div class="ba-body after-body">
+<pre><span class="cm">&lt;!-- Alignment fix: hero-inner is single-column,
+     max-width:740px. H1 and .hero-desc are
+     stacked siblings — no grid split. --&gt;</span>
+<span class="kw">&lt;section</span> <span class="at">class</span>=<span class="str">"hero"</span><span class="kw">&gt;</span>
+  <span class="kw">&lt;div</span> <span class="at">class</span>=<span class="str">"container"</span><span class="kw">&gt;</span>
+    <span class="kw">&lt;div</span> <span class="at">class</span>=<span class="str">"hero-inner"</span><span class="kw">&gt;</span>
+      <span class="cm">&lt;!-- CSS: max-width:740px (no flex/grid) --&gt;</span>
+      <span class="kw">&lt;h1&gt;</span>Self Inking Rubber Stamps
+        <span class="kw">&lt;span&gt;</span>4 Brands. 115+ Products.<span class="kw">&lt;/span&gt;</span>
+      <span class="kw">&lt;/h1&gt;</span>
+      <span class="cm">&lt;!-- Sibling of H1, same block flow --&gt;</span>
+      <span class="kw">&lt;p</span> <span class="at">class</span>=<span class="str">"hero-desc"</span><span class="kw">&gt;</span>
+        DF, Trodat, Colop &amp; Trodat
+        Multi-Colour — all fully
+        customisable. From $30.
+      <span class="kw">&lt;/p&gt;</span>
+      <span class="cm">&lt;!-- stats + CTAs below --&gt;</span>
+    <span class="kw">&lt;/div&gt;</span>
+  <span class="kw">&lt;/div&gt;</span>
+<span class="kw">&lt;/section&gt;</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── S5: BRAND STRIP ── -->
+  <div class="section" id="s5">
+    <div class="section-head-row">
+      <div class="section-num">5</div>
+      <span class="section-eyebrow" style="margin-bottom:0">Sticky Navigation</span>
+    </div>
+    <h2 class="section-h2">Brand Filter Strip</h2>
+    <hr class="section-divider">
+    <p class="section-intro">A sticky brand navigation bar sits between the hero and product grid. Users can switch between all 4 brand product panels without scrolling back to the top. Uses ARIA <code>role="tablist"</code> for accessibility.</p>
+
+    <div class="seo-box">
+      <div class="seo-box-hd">📈 SEO Purpose</div>
+      <ul>
+        <li>Keeps users on-page instead of bouncing to brand sub-pages — increases dwell time signal.</li>
+        <li>Tab count labels (31, 36, 30, 18) communicate product depth, improving user click confidence.</li>
+        <li>Each tab uses <code>aria-controls</code> pointing to the corresponding panel ID — accessible and crawlable.</li>
+        <li><code>position:sticky; top:62px</code> — always visible as users scroll, reducing pogo-sticking back to SERPs.</li>
+      </ul>
+    </div>
+
+    <div class="ba-grid">
+      <div class="ba-col">
+        <div class="ba-header before-h"><span class="ba-dot before-dot"></span>Existing Code (live page)</div>
+        <div class="ba-body before-body">
+          <em>No brand navigation exists. Single brand (DF) only. No tab or switching mechanism.</em>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>Proposed Code</div>
+        <div class="ba-body after-body">
+<pre><span class="kw">&lt;div</span> <span class="at">class</span>=<span class="str">"brand-strip"</span>
+  <span class="at">role</span>=<span class="str">"tablist"</span>
+  <span class="at">aria-label</span>=<span class="str">"Filter products by brand"</span>
+  <span class="at">style</span>=<span class="str">"position:sticky;top:62px"</span><span class="kw">&gt;</span>
+  <span class="kw">&lt;div</span> <span class="at">class</span>=<span class="str">"container"</span><span class="kw">&gt;</span>
+    <span class="kw">&lt;button</span>
+      <span class="at">class</span>=<span class="str">"bs-tab bs-tab-df on"</span>
+      <span class="at">onclick</span>=<span class="str">"switchBrand('df',this)"</span>
+      <span class="at">role</span>=<span class="str">"tab"</span>
+      <span class="at">aria-selected</span>=<span class="str">"true"</span>
+      <span class="at">aria-controls</span>=<span class="str">"panel-df"</span><span class="kw">&gt;</span>
+      DF Stamps
+      <span class="kw">&lt;span</span> <span class="at">class</span>=<span class="str">"cnt"</span><span class="kw">&gt;</span>31<span class="kw">&lt;/span&gt;</span>
+    <span class="kw">&lt;/button&gt;</span>
+    <span class="cm">&lt;!-- + Trodat, Colop, Multi-Colour tabs --&gt;</span>
+  <span class="kw">&lt;/div&gt;</span>
+<span class="kw">&lt;/div&gt;</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── S6: PRODUCT GRID ── -->
+  <div class="section" id="s6">
+    <div class="section-head-row">
+      <div class="section-num">6</div>
+      <span class="section-eyebrow" style="margin-bottom:0">Critical Technical Decision</span>
+    </div>
+    <h2 class="section-h2">Product Grid — DOM Rendering Strategy</h2>
+    <hr class="section-divider">
+    <p class="section-intro">This is the most important technical decision on the page. How products are rendered determines whether Google can index them — and therefore whether they contribute to rankings at all.</p>
+
+    <div class="seo-box">
+      <div class="seo-box-hd">📈 SEO Purpose — Three options, only one is correct</div>
+      <ul>
+        <li><strong>Option A — JS-rendered (DO NOT USE):</strong> Products injected by JavaScript after page load. Googlebot may not execute JS on first crawl pass. Products invisible to search engine = zero indexation value.</li>
+        <li><strong>Option B — Lazy load per tab click (DO NOT USE):</strong> Products only fetch when a tab is clicked. Google never clicks. Structured data referencing these products would also be invalid since the content doesn't exist in the HTML.</li>
+        <li><strong>Option C — Static DOM + CSS toggle (PROPOSED ✓):</strong> All 115 products are server-rendered in the HTML on page load. CSS <code>display:none</code> hides inactive brand panels visually. Googlebot reads all 115 product names, alt texts, and URLs on first crawl. <code>switchBrand()</code> only adds/removes a CSS class — no fetching, no innerHTML injection.</li>
+      </ul>
+    </div>
+
+    <div class="ba-grid">
+      <div class="ba-col">
+        <div class="ba-header before-h"><span class="ba-dot before-dot"></span>Existing Code (live page)</div>
+        <div class="ba-body before-body">
+<pre><span class="cm">&lt;!-- 31 DF products dynamically
+     rendered by PHP on page request.
+     Single brand only. No tab system. --&gt;</span>
+<span class="kw">&lt;div</span> <span class="at">class</span>=<span class="str">"category-products-with-sidebar"</span><span class="kw">&gt;</span>
+  <span class="kw">&lt;div</span> <span class="at">class</span>=<span class="str">"sidebar"</span><span class="kw">&gt;</span>
+    <span class="cm">&lt;!-- shape/line/dim filters --&gt;</span>
+  <span class="kw">&lt;/div&gt;</span>
+  <span class="kw">&lt;div</span> <span class="at">class</span>=<span class="str">"products"</span><span class="kw">&gt;</span>
+    <span class="cm">&lt;!-- DF products only (31) --&gt;</span>
+  <span class="kw">&lt;/div&gt;</span>
+<span class="kw">&lt;/div&gt;</span></pre>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>Proposed Code (CSS-toggle only)</div>
+        <div class="ba-body after-body">
+<pre><span class="cm">&lt;!-- ALL 4 brand panels in HTML on page load --&gt;</span>
+<span class="cm">// CSS: .tab-panel { display: none }
+// CSS: .tab-panel.on { display: block }</span>
+
+<span class="kw">&lt;div</span> <span class="at">id</span>=<span class="str">"panel-df"</span> <span class="at">class</span>=<span class="str">"tab-panel on"</span><span class="kw">&gt;</span>
+  <span class="cm">&lt;!-- 31 DF product cards, static HTML --&gt;</span>
+<span class="kw">&lt;/div&gt;</span>
+
+<span class="kw">&lt;div</span> <span class="at">id</span>=<span class="str">"panel-trodat"</span> <span class="at">class</span>=<span class="str">"tab-panel"</span><span class="kw">&gt;</span>
+  <span class="cm">&lt;!-- 36 Trodat cards, CSS-hidden --&gt;</span>
+<span class="kw">&lt;/div&gt;</span>
+
+<span class="cm">&lt;!-- + Colop (30) + Multi-Colour (18) --&gt;</span>
+
+<span class="cm">// switchBrand() function:
+function switchBrand(brand, btn) {
+  // Removes .on from all panels
+  // Adds .on to selected panel
+  // NO fetch(), NO innerHTML, NO lazy load
+}</span>
+
+<span class="cm">// initGrid() limits visible cards to
+// first 8 per brand to protect LCP.
+// All cards still exist in DOM.
+// Google reads all 115.</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── S7: IMAGE ALT ── -->
+  <div class="section" id="s7">
+    <div class="section-head-row">
+      <div class="section-num">7</div>
+      <span class="section-eyebrow" style="margin-bottom:0">Accessibility + Image SEO</span>
+    </div>
+    <h2 class="section-h2">Product Image Alt &amp; Title Attributes</h2>
+    <hr class="section-divider">
+    <p class="section-intro">The existing page has <strong>33 product images with no alt text</strong> (verified by audit) and 0 title attributes. This is a WCAG 2.1 Level A accessibility failure and a significant Image Search ranking opportunity being missed.</p>
+
+    <div class="seo-box">
+      <div class="seo-box-hd">📈 SEO Purpose</div>
+      <ul>
+        <li><strong>alt attribute:</strong> Primary signal for Google Image Search ranking. Also fallback text for screen readers and when image fails to load.</li>
+        <li><strong>title attribute:</strong> Tooltip on hover; additional keyword signal; standard ecommerce practice on product listings.</li>
+        <li><strong>"from $X" convention:</strong> Matches Google Shopping, Amazon, and eBay standard. "Starts at" implies a configurable floor price. "Starts from" is grammatically awkward. <strong>Use "from $X".</strong></li>
+        <li><strong>width + height:</strong> Adding explicit dimensions prevents CLS (Cumulative Layout Shift) — a Core Web Vital metric that directly affects ranking.</li>
+      </ul>
+    </div>
+
+    <div class="ba-grid">
+      <div class="ba-col">
+        <div class="ba-header before-h"><span class="ba-dot before-dot"></span>Existing Code (33 of 33 product images)</div>
+        <div class="ba-body before-body">
+<pre><span class="cm">&lt;!-- NO alt text on any product image.
+     NO title attribute.
+     NO width/height dimensions.
+     33 WCAG violations + 33 SEO misses. --&gt;</span>
+<span class="kw">&lt;img</span>
+  <span class="at">src</span>=<span class="str">"https://stamps-storage.syd1.
+  digitaloceanspaces.com/product/image/
+  df-1028a-9744.jpg"</span>
+  <span class="at">loading</span>=<span class="str">"lazy"</span><span class="kw">&gt;</span></pre>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>Proposed Code (all 115 product images)</div>
+        <div class="ba-body after-body">
+<pre><span class="kw">&lt;img</span>
+  <span class="at">src</span>=<span class="str">"https://stamps-storage.syd1.
+  digitaloceanspaces.com/product/image/
+  df-1028a-9744.jpg"</span>
+  <span class="at">alt</span>=<span class="str">"Product Full Shot of DF 1028
+  Self Inking Rubber Stamp 28mm x 10mm"</span>
+  <span class="at">title</span>=<span class="str">"Buy DF 1028 Self Inking Rubber
+  Stamp 28mm x 10mm — from $30.00
+  | StampStore Australia"</span>
+  <span class="at">loading</span>=<span class="str">"lazy"</span>
+  <span class="at">width</span>=<span class="str">"200"</span> <span class="at">height</span>=<span class="str">"200"</span><span class="kw">&gt;</span>
+
+<span class="cm">// PHP template pattern:
+// alt = "Product Full Shot of {$name}"
+// title = "Buy {$name} — from
+//          ${price_formatted}
+//          | StampStore Australia"</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── S8: BRAND CARDS + DECISION ── -->
+  <div class="section" id="s8">
+    <div class="section-head-row">
+      <div class="section-num">8</div>
+      <span class="section-eyebrow" style="margin-bottom:0">Internal Linking + Topical Depth</span>
+    </div>
+    <h2 class="section-h2">Brand Cards &amp; Decision Guide</h2>
+    <hr class="section-divider">
+    <p class="section-intro">Two new sections added below the product grid. These serve dual roles: UX conversion (helping users choose the right brand) and SEO topical depth (covering brand comparisons and long-tail "which stamp is best for X" queries).</p>
+
+    <div class="seo-box">
+      <div class="seo-box-hd">📈 SEO Purpose</div>
+      <ul>
+        <li><strong>Brand cards:</strong> Each card links to its brand sub-page, distributing page equity from the #1 ranking pillar page to all 4 brand-level pages. This strengthens the entire stamp product silo.</li>
+        <li><strong>Decision guide ("Choose X if…"):</strong> Directly targets informational queries that appear as "People Also Ask" in SERPs — "which self-inking stamp is best for office use", "trodat vs colop". Capturing these keeps users on-page and builds topical authority.</li>
+        <li>Both sections increase average dwell time by answering the "which one?" question before users bounce to Google for comparison searches.</li>
+      </ul>
+    </div>
+
+    <div class="ba-grid">
+      <div class="ba-col">
+        <div class="ba-header before-h"><span class="ba-dot before-dot"></span>Existing Code (live page)</div>
+        <div class="ba-body before-body">
+          <em>No brand cards section. No decision guide. Page serves only DF brand. Zero internal links to Trodat or Colop brand pages.</em>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>Proposed Code</div>
+        <div class="ba-body after-body">
+<pre><span class="cm">&lt;!-- Brand Cards: 4 cards, H2 headings,
+     each linking to brand sub-page --&gt;</span>
+<span class="kw">&lt;section</span> <span class="at">id</span>=<span class="str">"brands"</span><span class="kw">&gt;</span>
+  <span class="kw">&lt;h2</span> <span class="at">class</span>=<span class="str">"sec-t"</span><span class="kw">&gt;</span>
+    Four Brands. One Trusted Store.
+  <span class="kw">&lt;/h2&gt;</span>
+  <span class="kw">&lt;a</span> <span class="at">href</span>=<span class="str">"/df-self-inking-stamps"</span><span class="kw">&gt;</span>
+    <span class="kw">&lt;h2</span> <span class="at">class</span>=<span class="str">"brand-name"</span><span class="kw">&gt;</span>
+      DF Self Inking Stamps
+    <span class="kw">&lt;/h2&gt;</span>
+  <span class="kw">&lt;/a&gt;</span>
+  <span class="cm">&lt;!-- + Trodat, Colop, Multi-Colour --&gt;</span>
+<span class="kw">&lt;/section&gt;</span>
+
+<span class="cm">&lt;!-- Decision Guide: 2×2 H3 grid --&gt;</span>
+<span class="kw">&lt;section</span> <span class="at">id</span>=<span class="str">"choose"</span><span class="kw">&gt;</span>
+  <span class="kw">&lt;h2&gt;</span>Which Brand Should You Choose?<span class="kw">&lt;/h2&gt;</span>
+  <span class="kw">&lt;div</span> <span class="at">class</span>=<span class="str">"ch ch-df"</span><span class="kw">&gt;</span>
+    <span class="kw">&lt;h3</span> <span class="at">class</span>=<span class="str">"ch-title"</span><span class="kw">&gt;</span>
+      Choose DF If…
+    <span class="kw">&lt;/h3&gt;</span>
+    <span class="cm">&lt;!-- use case copy --&gt;</span>
+  <span class="kw">&lt;/div&gt;</span>
+<span class="kw">&lt;/section&gt;</span></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── S9: REVIEWS + FAQ ── -->
+  <div class="section" id="s9">
+    <div class="section-head-row">
+      <div class="section-num">9</div>
+      <span class="section-eyebrow" style="margin-bottom:0">E-E-A-T + Rich Results</span>
+    </div>
+    <h2 class="section-h2">Reviews &amp; FAQ Sections</h2>
+    <hr class="section-divider">
+    <p class="section-intro">Neither a reviews section nor a FAQ exists on the current live page. These two additions target different SEO goals: reviews build E-E-A-T and trust signals; FAQ targets rich results and People Also Ask capture.</p>
+
+    <div class="seo-box">
+      <div class="seo-box-hd">📈 SEO Purpose</div>
+      <ul>
+        <li><strong>Reviews (E-E-A-T):</strong> Real named reviews with dates are stronger E-E-A-T signals than anonymous testimonials. Aggregate 5.0 score feeds the LocalBusiness JSON-LD <code>aggregateRating</code> field, supporting rich result eligibility. Connect to the live review database for production — do not hardcode.</li>
+        <li><strong>FAQPage JSON-LD:</strong> Enables Google's FAQ rich result. Can appear as an expandable block below the main SERP listing, effectively doubling page real estate in search results. FAQ answers are also cited frequently in AI Overviews for branded/comparison queries.</li>
+        <li><strong>FAQ accordion is CSS max-height:</strong> Answer content is in the DOM at all times (Google reads it). The accordion uses <code>max-height:0 → 350px</code> transition — not <code>display:none</code> on answers — ensuring full crawlability.</li>
+      </ul>
+    </div>
+
+    <div class="ba-grid">
+      <div class="ba-col">
+        <div class="ba-header before-h"><span class="ba-dot before-dot"></span>Existing Code (live page)</div>
+        <div class="ba-body before-body">
+          <em>No reviews section. No FAQ section. No FAQPage JSON-LD. E-E-A-T signals on this page are minimal.</em>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>Proposed FAQ Code</div>
+        <div class="ba-body after-body">
+<pre><span class="cm">&lt;!-- FAQ: CSS accordion, answers always in DOM --&gt;</span>
+<span class="kw">&lt;div</span> <span class="at">class</span>=<span class="str">"faq-item"</span><span class="kw">&gt;</span>
+  <span class="kw">&lt;h3</span> <span class="at">class</span>=<span class="str">"faq-h3"</span><span class="kw">&gt;</span>
+    <span class="kw">&lt;button</span> <span class="at">class</span>=<span class="str">"faq-q"</span>
+      <span class="at">aria-expanded</span>=<span class="str">"false"</span>
+      <span class="at">onclick</span>=<span class="str">"faq(this)"</span><span class="kw">&gt;</span>
+      What brands does StampStore carry?
+    <span class="kw">&lt;/button&gt;</span>
+  <span class="kw">&lt;/h3&gt;</span>
+  <span class="kw">&lt;div</span> <span class="at">class</span>=<span class="str">"faq-ans"</span><span class="kw">&gt;</span>
+    <span class="cm">&lt;!-- CSS: max-height:0 (closed)
+         CSS: max-height:350px (open)
+         Answer text ALWAYS in DOM --&gt;</span>
+    <span class="kw">&lt;div</span> <span class="at">class</span>=<span class="str">"faq-ans-in"</span><span class="kw">&gt;</span>
+      StampStore carries four brands...
+    <span class="kw">&lt;/div&gt;</span>
+  <span class="kw">&lt;/div&gt;</span>
+<span class="kw">&lt;/div&gt;</span>
+<span class="cm">// 7 Q&amp;As total. FAQPage JSON-LD in &lt;head&gt;.</span></pre>
+        </div>
+      </div>
+    </div>
+    <div class="callout callout-info">
+      <span class="callout-icon">ℹ️</span>
+      <div><strong>Production Note</strong>The 4 reviews hardcoded in staging are real customer reviews extracted from the live site. For production, pull these dynamically from the review database so they stay current and the star count stays accurate.</div>
+    </div>
+  </div>
+
+  <!-- ── S10: MOBILE ── -->
+  <div class="section" id="s10">
+    <div class="section-head-row">
+      <div class="section-num">10</div>
+      <span class="section-eyebrow" style="margin-bottom:0">Mobile-First Indexing</span>
+    </div>
+    <h2 class="section-h2">Mobile Responsive — 5 Breakpoints</h2>
+    <hr class="section-divider">
+    <p class="section-intro">Google uses mobile-first indexing. The mobile version of this page is what Google primarily indexes and ranks. All 5 breakpoints ensure no content is hidden, collapsed, or overflow-clipped on any screen size.</p>
+
+    <div class="seo-box">
+      <div class="seo-box-hd">📈 SEO Purpose</div>
+      <ul>
+        <li>Mobile-first indexing means broken mobile layouts directly impact rankings. Content that overflows or is visually broken on mobile is still crawled, but user signals (bounce rate, dwell time) will suffer.</li>
+        <li>The brand strip uses <code>overflow-x:auto; scrollbar-width:none</code> on mobile to allow horizontal scrolling without the strip breaking layout.</li>
+        <li>CTA buttons stack full-width at 479px to maximise tap target size (minimum 44px per WCAG 2.1 guideline).</li>
+      </ul>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Breakpoint</th><th>Range</th><th>Product Grid</th><th>Brand Cards</th><th>Key Changes</th></tr></thead>
+        <tbody>
+          <tr><td>Full desktop</td><td>1100px+</td><td>4 columns</td><td>4 columns</td><td>Full layout, all elements visible</td></tr>
+          <tr><td>Small desktop</td><td>900–1099px</td><td>3 columns</td><td>2 columns</td><td>Reviews + feat grid → 2 cols</td></tr>
+          <tr><td>Tablet</td><td>768–899px</td><td>3 columns</td><td>2 columns</td><td>Decision guide + SEO → 1 col</td></tr>
+          <tr><td>Mobile</td><td>480–767px</td><td>2 columns</td><td>2 columns</td><td>Main nav hidden (preserve site mobile nav)</td></tr>
+          <tr><td>Small mobile</td><td>0–479px</td><td>2 columns</td><td>1 column</td><td>All grids stack; CTAs full-width</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout callout-warn">
+      <span class="callout-icon">⚠️</span>
+      <div><strong>Mobile Nav</strong>The staging file hides <code>.main-nav</code> at 767px but does not implement a hamburger menu. The existing site's mobile navigation component must be preserved and wired in — do not replace it with the desktop nav in the staging file.</div>
+    </div>
+  </div>
+
+  <!-- ── S11: SIGN-OFF ── -->
+  <div class="section" id="s11">
+    <div class="section-head-row">
+      <div class="section-num">11</div>
+      <span class="section-eyebrow" style="margin-bottom:0">Before Go-Live</span>
+    </div>
+    <h2 class="section-h2">Sign-off Checklist</h2>
+    <hr class="section-divider">
+    <p class="section-intro">Complete all items before pushing to production. This page currently ranks #1 — any broken implementation detail can cause ranking loss.</p>
+
+    <div class="cl-grid">
+      <div class="cl-item"><span class="cl-box"></span><div class="cl-label"><strong>Robots → index, follow</strong>Change meta robots from noindex,nofollow to index,follow</div></div>
+      <div class="cl-item"><span class="cl-box"></span><div class="cl-label"><strong>Canonical URL verified</strong>Confirm no trailing slash or parameter issues on canonical</div></div>
+      <div class="cl-item"><span class="cl-box"></span><div class="cl-label"><strong>4 JSON-LD schemas validated</strong>Run through Google Rich Results Test — 0 errors, 0 warnings</div></div>
+      <div class="cl-item"><span class="cl-box"></span><div class="cl-label"><strong>All 115 product cards in DOM</strong>View page source — verify all 4 brand panels exist in raw HTML, not injected by JS</div></div>
+      <div class="cl-item"><span class="cl-box"></span><div class="cl-label"><strong>Alt text on all product images</strong>Audit with browser DevTools: no <code>img</code> without <code>alt</code> in product grid</div></div>
+      <div class="cl-item"><span class="cl-box"></span><div class="cl-label"><strong>Brand strip tested on mobile</strong>Test at 375px and 414px — strip should scroll horizontally, not wrap or overflow</div></div>
+      <div class="cl-item"><span class="cl-box"></span><div class="cl-label"><strong>Filter + sort functional on all 4 panels</strong>Test each brand tab: shape filter, category filter, price sort both directions</div></div>
+      <div class="cl-item"><span class="cl-box"></span><div class="cl-label"><strong>Reviews connected to live database</strong>Replace hardcoded review HTML with dynamic query from review system</div></div>
+      <div class="cl-item"><span class="cl-box"></span><div class="cl-label"><strong>Dev banner removed</strong>Remove <code>.dev-top</code> banner and dev notes link from production template</div></div>
+      <div class="cl-item"><span class="cl-box"></span><div class="cl-label"><strong>Site mobile nav preserved</strong>Confirm existing mobile hamburger nav works at 767px breakpoint</div></div>
+      <div class="cl-item"><span class="cl-box"></span><div class="cl-label"><strong>OG image accessible</strong>Confirm the OG image URL (stamps.jpg) returns 200 and is 1200×630</div></div>
+      <div class="cl-item"><span class="cl-box"></span><div class="cl-label"><strong>Core Web Vitals baseline</strong>Run PageSpeed Insights before and after. Document LCP, CLS, INP delta.</div></div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- FOOTER -->
+<div class="doc-footer">
+  <div>
+    Developer Implementation Notes &mdash; Self Inking Rubber Stamps | StampStore Australia
+    &nbsp;&nbsp;·&nbsp;&nbsp;
+    <a href="self-inking-rubber-stamps.html">← Back to Pillar Page</a>
+  </div>
+  <div>
+    Prepared by: <strong style="color:rgba(255,255,255,.85)">Girish Kumar G</strong> | Programmatic SEO Manager &mdash; <em>Father of SEO</em>
+  </div>
+</div>
+
+</body>
+</html>

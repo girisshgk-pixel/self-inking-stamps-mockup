@@ -322,7 +322,7 @@ company name, address...
     </div>
     <h2 class="section-h2">Structured Data (JSON-LD)</h2>
     <hr class="section-divider">
-    <p class="section-intro">The existing page has <strong>zero structured data</strong> — 0 JSON-LD blocks found. The proposed page adds 4 static schemas to <code>&lt;head&gt;</code>, each targeting a different rich result type.</p>
+    <p class="section-intro">The existing page has <strong>zero structured data</strong> — 0 JSON-LD blocks found. The proposed page adds 4 static schemas to <code>&lt;head&gt;</code>. All are server-rendered in the HTML response, not JS-injected. Below are the complete scripts and their PHP dynamic equivalents.</p>
 
     <div class="seo-box">
       <div class="seo-box-hd">📈 SEO Purpose</div>
@@ -335,52 +335,324 @@ company name, address...
       </ul>
     </div>
 
-    <div class="ba-grid">
-      <div class="ba-col">
-        <div class="ba-header before-h"><span class="ba-dot before-dot"></span>Existing Code (live page)</div>
-        <div class="ba-body before-body">
-          <em>0 JSON-LD blocks on the current live page. No structured data of any kind.</em>
-<pre><span class="cm">// Verified: zero &lt;script type="application/ld+json"&gt;
-// blocks found in the existing page HTML.
-// No BreadcrumbList.
-// No Product schema.
-// No FAQPage.
-// No LocalBusiness.</span></pre>
-        </div>
-      </div>
-      <div class="ba-col">
-        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>Proposed Code (in &lt;head&gt;)</div>
-        <div class="ba-body after-body">
-<pre><span class="cm">&lt;!-- 1 of 4: BreadcrumbList --&gt;</span>
-<span class="kw">&lt;script</span> <span class="at">type</span>=<span class="str">"application/ld+json"</span><span class="kw">&gt;</span>
-<span class="str">{
-  "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  "itemListElement": [
-    { "@type": "ListItem", "position": 1,
-      "name": "Home",
-      "item": "https://stamps.net.au" },
-    { "@type": "ListItem", "position": 2,
-      "name": "Self Inking Rubber Stamps",
-      "item": "https://stamps.net.au/
-               self-inking-rubber-stamps" }
-  ]
-}</span>
-<span class="kw">&lt;/script&gt;</span>
-
-<span class="cm">&lt;!-- 2 of 4: ItemList (16 featured) --&gt;</span>
-<span class="cm">&lt;!-- 3 of 4: FAQPage (7 Q&amp;As) --&gt;</span>
-<span class="cm">&lt;!-- 4 of 4: LocalBusiness --&gt;</span>
-<span class="cm">// All 4 schemas: static server-rendered HTML
-// NO JavaScript injection
-// Validate at: search.google.com/test/rich-results</span></pre>
-        </div>
-      </div>
+    <div class="callout callout-warn">
+      <span class="callout-icon">⚠️</span>
+      <div><strong>Placement Rule</strong>All 4 <code>&lt;script type="application/ld+json"&gt;</code> blocks must be output inside <code>&lt;head&gt;</code> via the server-rendered HTML response — not injected by JavaScript after page load. Use <code>wp_head</code> action or equivalent hook. Googlebot does not guarantee JS execution on first crawl.</div>
     </div>
+
     <div class="callout callout-info">
       <span class="callout-icon">ℹ️</span>
-      <div><strong>Validation Step</strong>After deployment, run the live URL through <a href="https://search.google.com/test/rich-results" target="_blank">Google Rich Results Test</a>. All 4 schemas should validate with no errors or warnings.</div>
+      <div><strong>Validation</strong>After deployment, test the live URL at <a href="https://search.google.com/test/rich-results" target="_blank">search.google.com/test/rich-results</a>. All 4 schemas must show as valid with 0 errors and 0 warnings before go-live sign-off.</div>
     </div>
+
+    <!-- ── SCHEMA 1: BreadcrumbList ── -->
+    <div style="margin-top:32px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <div class="section-num" style="background:#7c3aed;width:24px;height:24px;font-size:11px">1</div>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#7c3aed">BreadcrumbList</span>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:4px">— Breadcrumb trail in SERP snippet</span>
+      </div>
+    </div>
+    <div class="ba-grid">
+      <div class="ba-col">
+        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>JSON-LD Script (static output)</div>
+        <div class="ba-body after-body">
+<pre><span class="kw">&lt;script</span> <span class="at">type</span>=<span class="str">"application/ld+json"</span><span class="kw">&gt;</span>
+{
+  <span class="at">"@context"</span>: <span class="str">"https://schema.org"</span>,
+  <span class="at">"@type"</span>: <span class="str">"BreadcrumbList"</span>,
+  <span class="at">"itemListElement"</span>: [
+    {
+      <span class="at">"@type"</span>: <span class="str">"ListItem"</span>,
+      <span class="at">"position"</span>: <span class="va">1</span>,
+      <span class="at">"name"</span>: <span class="str">"Home"</span>,
+      <span class="at">"item"</span>: <span class="str">"https://stamps.net.au"</span>
+    },
+    {
+      <span class="at">"@type"</span>: <span class="str">"ListItem"</span>,
+      <span class="at">"position"</span>: <span class="va">2</span>,
+      <span class="at">"name"</span>: <span class="str">"Self Inking Rubber Stamps"</span>,
+      <span class="at">"item"</span>: <span class="str">"https://stamps.net.au/self-inking-rubber-stamps"</span>
+    }
+  ]
+}
+<span class="kw">&lt;/script&gt;</span></pre>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-header before-h"><span class="ba-dot before-dot" style="background:#7c3aed"></span>PHP Dynamic Tag</div>
+        <div class="ba-body before-body">
+<pre>&lt;?php
+// BreadcrumbList — static for this page, no dynamic fields needed
+// Render directly from template or wp_head action
+
+$breadcrumb = [
+  "@context" =&gt; "https://schema.org",
+  "@type"    =&gt; "BreadcrumbList",
+  "itemListElement" =&gt; [
+    ["@type"=&gt;"ListItem","position"=&gt;1,"name"=&gt;"Home","item"=&gt;home_url()],
+    ["@type"=&gt;"ListItem","position"=&gt;2,
+     "name"   =&gt; get_the_title(),
+     "item"   =&gt; get_permalink()]
+  ]
+];
+echo '&lt;script type="application/ld+json"&gt;';
+echo wp_json_encode($breadcrumb);
+echo '&lt;/script&gt;';
+?&gt;</pre>
+          <p style="margin-top:12px;font-size:12.5px;color:var(--text-muted)">Dynamic fields: <code>home_url()</code>, <code>get_the_title()</code>, <code>get_permalink()</code></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SCHEMA 2: ItemList ── -->
+    <div style="margin-top:28px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <div class="section-num" style="background:#0369a1;width:24px;height:24px;font-size:11px">2</div>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#0369a1">ItemList</span>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:4px">— 16 featured products (first 4 per brand) · Product carousel eligibility</span>
+      </div>
+    </div>
+    <div class="ba-grid">
+      <div class="ba-col">
+        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>JSON-LD Script (first 4 of 16 items shown)</div>
+        <div class="ba-body after-body">
+<pre><span class="kw">&lt;script</span> <span class="at">type</span>=<span class="str">"application/ld+json"</span><span class="kw">&gt;</span>
+{
+  <span class="at">"@context"</span>: <span class="str">"https://schema.org"</span>,
+  <span class="at">"@type"</span>: <span class="str">"ItemList"</span>,
+  <span class="at">"name"</span>: <span class="str">"Self Inking Rubber Stamps \u2014 Featured Products"</span>,
+  <span class="at">"url"</span>: <span class="str">"https://stamps.net.au/self-inking-rubber-stamps"</span>,
+  <span class="at">"numberOfItems"</span>: <span class="va">16</span>,
+  <span class="at">"itemListElement"</span>: [
+    {
+      <span class="at">"@type"</span>: <span class="str">"ListItem"</span>,
+      <span class="at">"position"</span>: <span class="va">1</span>,
+      <span class="at">"url"</span>: <span class="str">"https://stamps.net.au/rubber-stamps/df1028-self-inking-rubber-stamp-28mm-x-10mm"</span>,
+      <span class="at">"name"</span>: <span class="str">"DF 1028 Self Inking Rubber Stamp 28mm x 10mm"</span>
+    },
+    {
+      <span class="at">"@type"</span>: <span class="str">"ListItem"</span>,
+      <span class="at">"position"</span>: <span class="va">2</span>,
+      <span class="at">"url"</span>: <span class="str">"https://stamps.net.au/rubber-stamps/df-3-self-inking-rubber-stamp-13mm-diameter"</span>,
+      <span class="at">"name"</span>: <span class="str">"DF 13 Self Inking Rubber Stamp 13mm Diameter"</span>
+    },
+    {
+      <span class="at">"@type"</span>: <span class="str">"ListItem"</span>,
+      <span class="at">"position"</span>: <span class="va">3</span>,
+      <span class="at">"url"</span>: <span class="str">"https://stamps.net.au/rubber-stamps/df1755-self-inking-rubber-stamp-55mm-x-17mm"</span>,
+      <span class="at">"name"</span>: <span class="str">"DF 1755 Self Inking Rubber Stamp 55mm x 17mm"</span>
+    },
+    {
+      <span class="at">"@type"</span>: <span class="str">"ListItem"</span>,
+      <span class="at">"position"</span>: <span class="va">4</span>,
+      <span class="at">"url"</span>: <span class="str">"https://stamps.net.au/rubber-stamps/df1355-self-inking-rubber-stamp-55mm-x-13mm"</span>,
+      <span class="at">"name"</span>: <span class="str">"DF 1355 Self Inking Rubber Stamp 55mm x 13mm"</span>
+    }
+  ]
+,
+    ... // + 12 more items (positions 5–16)
+  ]
+}
+<span class="kw">&lt;/script&gt;</span></pre>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-header before-h"><span class="ba-dot before-dot" style="background:#0369a1"></span>PHP Dynamic Tag</div>
+        <div class="ba-body before-body">
+<pre>&lt;?php
+// ItemList — dynamically build from first 4 products per brand
+// Call via wp_head action after products are loaded
+
+$featured = [];
+$position = 1;
+foreach ($brand_groups as $brand =&gt; $products) {
+    foreach (array_slice($products, 0, 4) as $product) {
+        $featured[] = [
+            "@type"    =&gt; "ListItem",
+            "position" =&gt; $position++,
+            "url"      =&gt; get_permalink($product-&gt;ID),
+            "name"     =&gt; get_the_title($product-&gt;ID)
+        ];
+    }
+}
+
+$schema = [
+  "@context"       =&gt; "https://schema.org",
+  "@type"          =&gt; "ItemList",
+  "name"           =&gt; get_the_title() . " — Featured Products",
+  "url"            =&gt; get_permalink(),
+  "numberOfItems"  =&gt; count($featured),
+  "itemListElement"=&gt; $featured
+];
+echo '&lt;script type="application/ld+json"&gt;';
+echo wp_json_encode($schema);
+echo '&lt;/script&gt;';
+?&gt;</pre>
+          <p style="margin-top:12px;font-size:12.5px;color:var(--text-muted)">Dynamic fields: <code>$brand_groups</code> (product query result), <code>get_permalink()</code>, <code>get_the_title()</code> per product</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SCHEMA 3: FAQPage ── -->
+    <div style="margin-top:28px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <div class="section-num" style="background:#15803d;width:24px;height:24px;font-size:11px">3</div>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#15803d">FAQPage</span>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:4px">— 7 Q&amp;As · FAQ rich result · AI Overview citations</span>
+      </div>
+    </div>
+    <div class="ba-grid">
+      <div class="ba-col">
+        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>JSON-LD Script (first 2 of 7 Q&amp;As shown)</div>
+        <div class="ba-body after-body">
+<pre><span class="kw">&lt;script</span> <span class="at">type</span>=<span class="str">"application/ld+json"</span><span class="kw">&gt;</span>
+{
+  <span class="at">"@context"</span>: <span class="str">"https://schema.org"</span>,
+  <span class="at">"@type"</span>: <span class="str">"FAQPage"</span>,
+  <span class="at">"mainEntity"</span>: [
+    {
+      <span class="at">"@type"</span>: <span class="str">"Question"</span>,
+      <span class="at">"name"</span>: <span class="str">"What brands of self-inking stamps does StampStore carry?"</span>,
+      <span class="at">"acceptedAnswer"</span>: {
+        <span class="at">"@type"</span>: <span class="str">"Answer"</span>,
+        <span class="at">"text"</span>: <span class="str">"StampStore carries four brands: DF (own brand, best value, 11 ink colours, from $30), Trodat (Austrian-made, industrial durability), Colop (Austrian, eco-friendly precision), and Trodat Multi-Colour (up to 15 colours per impression). All are customisable with fast Australia-wide delivery."</span>
+      }
+    },
+    {
+      <span class="at">"@type"</span>: <span class="str">"Question"</span>,
+      <span class="at">"name"</span>: <span class="str">"What is the difference between DF, Trodat and Colop stamps?"</span>,
+      <span class="at">"acceptedAnswer"</span>: {
+        <span class="at">"@type"</span>: <span class="str">"Answer"</span>,
+        <span class="at">"text"</span>: <span class="str">"DF is the widest-range, best-value option from $30 with 11 ink colours across sizes 28x10mm to 90x130mm. Trodat is the global benchmark for high-volume professional use. Colop leads on eco-friendly materials and transparent alignment windows."</span>
+      }
+    }
+  ]
+,
+    ... // + 5 more questions
+  ]
+}
+<span class="kw">&lt;/script&gt;</span></pre>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-header before-h"><span class="ba-dot before-dot" style="background:#15803d"></span>PHP Dynamic Tag</div>
+        <div class="ba-body before-body">
+<pre>&lt;?php
+// FAQPage — static Q&amp;As, hardcoded for this page
+// Update answers if FAQ copy changes
+
+$faqs = [
+  [
+    "q" =&gt; "What brands of self-inking stamps does StampStore carry?",
+    "a" =&gt; "StampStore carries four brands: DF (own brand, best value,
+            11 ink colours, from $30), Trodat (Austrian-made, industrial
+            durability), Colop (Austrian, eco-friendly precision), and
+            Trodat Multi-Colour (up to 15 colours per impression)."
+  ],
+  [
+    "q" =&gt; "What is the difference between DF, Trodat and Colop stamps?",
+    "a" =&gt; "DF is the widest-range, best-value option from $30 with 11
+            ink colours across sizes 28x10mm to 90x130mm. Trodat is the
+            global benchmark for high-volume professional use. Colop
+            leads on eco-friendly materials and transparent alignment
+            windows."
+  ],
+  // + 5 more Q&amp;As — see full schema in page &lt;head&gt;
+];
+
+$entities = array_map(fn($f) =&gt; [
+  "@type" =&gt; "Question",
+  "name"  =&gt; $f["q"],
+  "acceptedAnswer" =&gt; ["@type"=&gt;"Answer","text"=&gt;$f["a"]]
+], $faqs);
+
+$schema = [
+  "@context"   =&gt; "https://schema.org",
+  "@type"      =&gt; "FAQPage",
+  "mainEntity" =&gt; $entities
+];
+echo '&lt;script type="application/ld+json"&gt;';
+echo wp_json_encode($schema);
+echo '&lt;/script&gt;';
+?&gt;</pre>
+          <p style="margin-top:12px;font-size:12.5px;color:var(--text-muted)">Dynamic fields: <strong>None</strong> — Q&amp;As are static copy. Update <code>$faqs</code> array if FAQ content changes.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SCHEMA 4: LocalBusiness ── -->
+    <div style="margin-top:28px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <div class="section-num" style="background:#b45309;width:24px;height:24px;font-size:11px">4</div>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#b45309">LocalBusiness</span>
+        <span style="font-size:11px;color:var(--text-muted);margin-left:4px">— Business entity · Geo-ranking signal · AggregateRating</span>
+      </div>
+    </div>
+    <div class="ba-grid">
+      <div class="ba-col">
+        <div class="ba-header after-h"><span class="ba-dot after-dot"></span>JSON-LD Script (full)</div>
+        <div class="ba-body after-body">
+<pre><span class="kw">&lt;script</span> <span class="at">type</span>=<span class="str">"application/ld+json"</span><span class="kw">&gt;</span>
+{
+  <span class="at">"@context"</span>: <span class="str">"https://schema.org"</span>,
+  <span class="at">"@type"</span>: <span class="str">"LocalBusiness"</span>,
+  <span class="at">"name"</span>: <span class="str">"StampStore"</span>,
+  <span class="at">"telephone"</span>: <span class="str">"1300782671"</span>,
+  <span class="at">"url"</span>: <span class="str">"https://stamps.net.au"</span>,
+  <span class="at">"address"</span>: {
+    <span class="at">"@type"</span>: <span class="str">"PostalAddress"</span>,
+    <span class="at">"streetAddress"</span>: <span class="str">"6 Wookey Street"</span>,
+    <span class="at">"addressLocality"</span>: <span class="str">"Thomastown"</span>,
+    <span class="at">"addressRegion"</span>: <span class="str">"VIC"</span>,
+    <span class="at">"postalCode"</span>: <span class="str">"3074"</span>,
+    <span class="at">"addressCountry"</span>: <span class="str">"AU"</span>
+  },
+  <span class="at">"openingHours"</span>: <span class="str">"Mo-Fr 09:00-16:00"</span>,
+  <span class="at">"aggregateRating"</span>: {
+    <span class="at">"@type"</span>: <span class="str">"AggregateRating"</span>,
+    <span class="at">"ratingValue"</span>: <span class="str">"5"</span>,
+    <span class="at">"reviewCount"</span>: <span class="str">"4"</span>
+  }
+}
+<span class="kw">&lt;/script&gt;</span></pre>
+        </div>
+      </div>
+      <div class="ba-col">
+        <div class="ba-header before-h"><span class="ba-dot before-dot" style="background:#b45309"></span>PHP Dynamic Tag</div>
+        <div class="ba-body before-body">
+<pre>&lt;?php
+// LocalBusiness — static, update if address/hours change
+$schema = [
+  "@context"  =&gt; "https://schema.org",
+  "@type"     =&gt; "LocalBusiness",
+  "name"      =&gt; "StampStore",
+  "telephone" =&gt; "1300782671",
+  "url"       =&gt; home_url(),
+  "address"   =&gt; [
+    "@type"           =&gt; "PostalAddress",
+    "streetAddress"   =&gt; "6 Wookey Street",
+    "addressLocality" =&gt; "Thomastown",
+    "addressRegion"   =&gt; "VIC",
+    "postalCode"      =&gt; "3074",
+    "addressCountry"  =&gt; "AU"
+  ],
+  "openingHours"    =&gt; "Mo-Fr 09:00-16:00",
+  "aggregateRating" =&gt; [
+    "@type"       =&gt; "AggregateRating",
+    "ratingValue" =&gt; get_field('review_avg_score') ?: "5",
+    "reviewCount" =&gt; get_field('review_count')     ?: "4"
+  ]
+];
+echo '&lt;script type="application/ld+json"&gt;';
+echo wp_json_encode($schema);
+echo '&lt;/script&gt;';
+?&gt;</pre>
+          <p style="margin-top:12px;font-size:12.5px;color:var(--text-muted)">Dynamic fields: <code>home_url()</code>, <code>get_field('review_avg_score')</code>, <code>get_field('review_count')</code> — update via ACF when review count changes.</p>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── S3: HEADINGS ── -->
